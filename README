@@ -1,0 +1,47 @@
+* Installation:
+
+virtualenv myenv
+source myenv/bin/activate
+pip install -r requirements.txt
+
+createdb -U postgres opsline
+python manage.py db upgrade
+# will need to change postgres password in app/__init__.py according to what
+# yours is
+
+* Run
+
+python manage.py runserver
+
+In the browser, navigate to http://localhost:5000/#!/api to access swagger
+
+* Using the api
+
+- First create a user by sending a put request to /auth
+- Can log in later with a post request sent to /auth
+- Either endpoint will return an auth_token and the user
+
+- Can create other users or account using this auth_token in put requests
+- Can edit objects using this auth_token in post requests
+- Can view objects using the auth_token for get requests
+- Can delete objects using the auth_token for delete requests
+
+For each of the above actions, the user who made the action is recorded
+in the audit table.  These can be accessed through any get request beginning
+with /audit.  Audits are not created manually by the user, and no auth_token
+is therefore needed to view them.
+
+* Implementation details for Audits
+
+To make a more automatic system to audit every action taken, two strategies were
+used.
+
+The first is to create a service that converts models into dicts for responses.
+When each model is converted to json, we see if the current request is a GET
+request.  If it is, we create an Audit.
+
+For editing and deleting, I use a before_flush listener through sqlalchemy.
+Before any changes are made to the models, we also record audit objects
+that are then linked to each edited or deleted object.  A similar strategy
+is used for created objects, but we cannot create the audit until before_commit,
+because no id for the user or account yet exists to insert into audit.object_id.
